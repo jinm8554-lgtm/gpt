@@ -147,15 +147,8 @@ export default function AIImageGenerator() {
             prompt,
           });
 
-          const optimizedEvent = (optimizeResult as any[]).find(
-            (e: any) => e.type === "prompt_optimized"
-          );
-          if (
-            optimizedEvent &&
-            typeof optimizedEvent === "object" &&
-            "optimized_prompt" in optimizedEvent
-          ) {
-            finalPrompt = (optimizedEvent as any).optimized_prompt;
+          if (optimizeResult?.optimized) {
+            finalPrompt = optimizeResult.optimized;
           }
 
           setTasks((prev) =>
@@ -192,23 +185,12 @@ export default function AIImageGenerator() {
 
       const generateResult = await generateMutation.mutateAsync({
         prompt: finalPrompt,
-        aspect_ratio: aspectRatio,
-        size,
-        quality,
+        size: (size as "256x256" | "512x512" | "1024x1024" | "1024x1792" | "1792x1024") || "1024x1024",
+        quality: (quality as "standard" | "hd") || "standard",
         n: count,
-        optimize_prompt: false,
-        output_format: format,
-        output_compression: null,
-        moderation,
       });
 
-      const completedEvent = (generateResult as any[]).find(
-        (e: any) => e.type === "image_completed"
-      );
-      const images =
-        completedEvent && "images" in completedEvent
-          ? (completedEvent as any).images
-          : [];
+      const images = (generateResult?.images || []) as any[]
 
       const elapsedMs = Date.now() - newTask.startedAt;
       setTasks((prev) =>
