@@ -70,7 +70,7 @@ export default function AIImageGenerator() {
   const [prompt, setPrompt] = useState("");
   const [aspectRatio, setAspectRatio] = useState("1:1");
   const [size, setSize] = useState("1024x1024");
-  const [quality, setQuality] = useState("auto");
+  const [quality, setQuality] = useState("standard");
   const [format, setFormat] = useState("png");
   const [moderation, setModeration] = useState("auto");
   const [count, setCount] = useState(1);
