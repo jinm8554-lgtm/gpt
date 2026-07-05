@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
@@ -53,6 +52,9 @@ const DEFAULT_NODE_INFO = JSON.stringify(
   null,
   2
 );
+
+const selectClassName =
+  "border-input bg-background h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]";
 
 function extractUploadUrl(data: UploadResponse) {
   return (
@@ -319,10 +321,14 @@ export default function RunningHubWorkflow() {
                   </div>
                   <div>
                     <Label className="mb-2 block text-sm font-semibold">实例类型</Label>
-                    <Select value={instanceType} onValueChange={setInstanceType}>
+                    <select
+                      className={selectClassName}
+                      value={instanceType}
+                      onChange={event => setInstanceType(event.target.value)}
+                    >
                       <option value="default">default / 24G 显存</option>
                       <option value="plus">plus / 48G 显存</option>
-                    </Select>
+                    </select>
                   </div>
                   <label className="flex items-center gap-2 text-sm">
                     <input
