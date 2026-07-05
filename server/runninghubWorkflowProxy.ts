@@ -1,4 +1,4 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response as ExpressResponse } from "express";
 import express from "express";
 
 const DEFAULT_WORKFLOW_ID = "2050306122774532097";
@@ -49,7 +49,7 @@ function getRunningHubWorkflowId() {
   return process.env.RUNNINGHUB_WORKFLOW_ID || DEFAULT_WORKFLOW_ID;
 }
 
-async function readResponseBody(response: Response | globalThis.Response) {
+async function readResponseBody(response: globalThis.Response) {
   const text = await response.text();
   if (!text) return null;
 
@@ -167,7 +167,7 @@ function normalizeRunBody(input: any) {
   return payload;
 }
 
-function sendError(res: Response, error: unknown) {
+function sendError(res: ExpressResponse, error: unknown) {
   if (error instanceof RunningHubHttpError) {
     return res.status(error.status).json({
       ok: false,
@@ -197,7 +197,7 @@ export function registerRunningHubWorkflowProxy(app: Express) {
   app.post(
     "/api/runninghub/media/upload",
     express.raw({ type: "*/*", limit: process.env.RUNNINGHUB_UPLOAD_LIMIT || "300mb" }),
-    async (req: Request, res: Response) => {
+    async (req: Request, res: ExpressResponse) => {
       try {
         const fileName = decodeURIComponent(
           String(req.headers["x-file-name"] || `upload-${Date.now()}`)
@@ -211,7 +211,7 @@ export function registerRunningHubWorkflowProxy(app: Express) {
     }
   );
 
-  app.post("/api/runninghub/workflow/run", async (req: Request, res: Response) => {
+  app.post("/api/runninghub/workflow/run", async (req: Request, res: ExpressResponse) => {
     try {
       const workflowId = String(req.body?.workflowId || getRunningHubWorkflowId());
       const payload = normalizeRunBody(req.body || {});
@@ -226,7 +226,7 @@ export function registerRunningHubWorkflowProxy(app: Express) {
     }
   });
 
-  app.post("/api/runninghub/workflow/query", async (req: Request, res: Response) => {
+  app.post("/api/runninghub/workflow/query", async (req: Request, res: ExpressResponse) => {
     try {
       const taskId = String(req.body?.taskId || "").trim();
       if (!taskId) {
@@ -240,7 +240,7 @@ export function registerRunningHubWorkflowProxy(app: Express) {
     }
   });
 
-  app.post("/api/runninghub/workflow/run-and-wait", async (req: Request, res: Response) => {
+  app.post("/api/runninghub/workflow/run-and-wait", async (req: Request, res: ExpressResponse) => {
     try {
       const workflowId = String(req.body?.workflowId || getRunningHubWorkflowId());
       const timeoutMs = Math.min(Number(req.body?.timeoutMs || 180000), 300000);
@@ -281,7 +281,7 @@ export function registerRunningHubWorkflowProxy(app: Express) {
     }
   });
 
-  app.post("/api/runninghub/workflow/webhook", (req: Request, res: Response) => {
+  app.post("/api/runninghub/workflow/webhook", (req: Request, res: ExpressResponse) => {
     console.log("[RunningHub webhook]", JSON.stringify(req.body, null, 2));
     res.json({ ok: true });
   });
