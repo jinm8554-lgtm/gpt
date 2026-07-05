@@ -2,9 +2,12 @@ import type { Express, Request, Response as ExpressResponse } from "express";
 import express from "express";
 
 const DEFAULT_WORKFLOW_ID = "2050306122774532097";
-const DEFAULT_RUNNINGHUB_API_BASE = "https://runninghub.cn/openapi/v2";
+const DEFAULT_RUNNINGHUB_API_BASE = "https://www.runninghub.cn/openapi/v2";
+const DEFAULT_SUBMIT_MODE = "ai-app";
 
 const TERMINAL_STATUSES = new Set(["SUCCESS", "FAILED", "CANCELED", "CANCELLED"]);
+
+type RunningHubSubmitMode = "ai-app" | "workflow";
 
 type RunningHubResult = {
   url?: string;
@@ -47,6 +50,19 @@ function getRunningHubApiBase() {
 
 function getRunningHubWorkflowId() {
   return process.env.RUNNINGHUB_WORKFLOW_ID || DEFAULT_WORKFLOW_ID;
+}
+
+function getRunningHubSubmitMode(inputMode?: unknown): RunningHubSubmitMode {
+  const mode = String(inputMode || process.env.RUNNINGHUB_SUBMIT_MODE || DEFAULT_SUBMIT_MODE)
+    .trim()
+    .toLowerCase();
+
+  if (mode === "workflow" || mode === "openapi-v2-workflow") return "workflow";
+  return "ai-app";
+}
+
+function getRunningHubRunPath(workflowId: string, mode: RunningHubSubmitMode) {
+  return mode === "workflow" ? `/run/workflow/${workflowId}` : `/run/ai-app/${workflowId}`;
 }
 
 async function readResponseBody(response: globalThis.Response) {
@@ -186,10 +202,18 @@ async function delay(ms: number) {
 
 export function registerRunningHubWorkflowProxy(app: Express) {
   app.get("/api/runninghub/workflow/config", (_req, res) => {
+    const workflowId = getRunningHubWorkflowId();
+    const submitMode = getRunningHubSubmitMode();
+    const runPath = getRunningHubRunPath(workflowId, submitMode);
+
     res.json({
       ok: true,
-      workflowId: getRunningHubWorkflowId(),
+      workflowId,
+      submitMode,
+      queryMode: "openapi-v2-query",
       apiBase: getRunningHubApiBase(),
+      runUrl: `${getRunningHubApiBase()}${runPath}`,
+      queryUrl: `${getRunningHubApiBase()}/query`,
       apiKeyConfigured: Boolean(getRunningHubApiKey()),
     });
   });
@@ -214,13 +238,12 @@ export function registerRunningHubWorkflowProxy(app: Express) {
   app.post("/api/runninghub/workflow/run", async (req: Request, res: ExpressResponse) => {
     try {
       const workflowId = String(req.body?.workflowId || getRunningHubWorkflowId());
+      const submitMode = getRunningHubSubmitMode(req.body?.submitMode);
       const payload = normalizeRunBody(req.body || {});
-      const result = await runningHubJsonRequest<RunningHubTaskResponse>(
-        `/run/workflow/${workflowId}`,
-        payload
-      );
+      const runPath = getRunningHubRunPath(workflowId, submitMode);
+      const result = await runningHubJsonRequest<RunningHubTaskResponse>(runPath, payload);
 
-      res.json({ ok: true, workflowId, result });
+      res.json({ ok: true, workflowId, submitMode, result });
     } catch (error) {
       sendError(res, error);
     }
@@ -243,15 +266,14 @@ export function registerRunningHubWorkflowProxy(app: Express) {
   app.post("/api/runninghub/workflow/run-and-wait", async (req: Request, res: ExpressResponse) => {
     try {
       const workflowId = String(req.body?.workflowId || getRunningHubWorkflowId());
+      const submitMode = getRunningHubSubmitMode(req.body?.submitMode);
       const timeoutMs = Math.min(Number(req.body?.timeoutMs || 180000), 300000);
       const intervalMs = Math.max(Number(req.body?.intervalMs || 4000), 1500);
       const startedAt = Date.now();
       const payload = normalizeRunBody(req.body || {});
+      const runPath = getRunningHubRunPath(workflowId, submitMode);
 
-      const createResult = await runningHubJsonRequest<RunningHubTaskResponse>(
-        `/run/workflow/${workflowId}`,
-        payload
-      );
+      const createResult = await runningHubJsonRequest<RunningHubTaskResponse>(runPath, payload);
 
       const taskId = createResult.taskId;
       if (!taskId) {
@@ -262,7 +284,7 @@ export function registerRunningHubWorkflowProxy(app: Express) {
 
       while (Date.now() - startedAt < timeoutMs) {
         if (latest.status && TERMINAL_STATUSES.has(latest.status)) {
-          return res.json({ ok: true, workflowId, taskId, result: latest });
+          return res.json({ ok: true, workflowId, submitMode, taskId, result: latest });
         }
 
         await delay(intervalMs);
@@ -272,6 +294,7 @@ export function registerRunningHubWorkflowProxy(app: Express) {
       res.status(202).json({
         ok: true,
         workflowId,
+        submitMode,
         taskId,
         timedOut: true,
         result: latest,
