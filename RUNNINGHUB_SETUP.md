@@ -6,17 +6,37 @@
 /runninghub
 ```
 
-当前默认工作流：
+## 0. 已确认的真实 RunningHub 信息
+
+从 AI CanvasPro 抓到的实际模型：
 
 ```txt
-2050306122774532097
+model: runninghub/2050306122774532097
+provider: runninghubwf
 ```
 
-官方调用页显示该工作流提交入口为：
+对应本地源码位置：
 
 ```txt
-/run/workflow/2050306122774532097
+D:\huabu\AI CanvasPro\resources\app\src\manifests\image\runninghub\qwenImageEditManifest.js:1
 ```
+
+当前工作流信息：
+
+```txt
+workflowId: 2050306122774532097
+提交模式：openapi-v2-ai-app
+查询模式：openapi-v2-query
+```
+
+真实 RunningHub 调用地址：
+
+```txt
+提交：https://www.runninghub.cn/openapi/v2/run/ai-app/2050306122774532097
+查询：https://www.runninghub.cn/openapi/v2/query
+```
+
+注意：这个工作流不是 `/run/workflow/{workflowId}` 模式，而是 `/run/ai-app/{workflowId}` 模式。
 
 ## 1. 必填环境变量
 
@@ -30,7 +50,8 @@ RUNNINGHUB_API_KEY=你的 RunningHub API Key
 
 ```bash
 RUNNINGHUB_WORKFLOW_ID=2050306122774532097
-RUNNINGHUB_API_BASE=https://runninghub.cn/openapi/v2
+RUNNINGHUB_API_BASE=https://www.runninghub.cn/openapi/v2
+RUNNINGHUB_SUBMIT_MODE=ai-app
 RUNNINGHUB_UPLOAD_LIMIT=300mb
 ```
 
@@ -40,12 +61,31 @@ RUNNINGHUB_UPLOAD_LIMIT=300mb
 RH_API_KEY=你的 RunningHub API Key
 ```
 
+如果以后遇到传统 workflow 提交模式，可以改成：
+
+```bash
+RUNNINGHUB_SUBMIT_MODE=workflow
+```
+
 ## 2. 已新增后端接口
 
 ### 获取配置
 
 ```http
 GET /api/runninghub/workflow/config
+```
+
+返回内容会包含：
+
+```json
+{
+  "workflowId": "2050306122774532097",
+  "submitMode": "ai-app",
+  "queryMode": "openapi-v2-query",
+  "runUrl": "https://www.runninghub.cn/openapi/v2/run/ai-app/2050306122774532097",
+  "queryUrl": "https://www.runninghub.cn/openapi/v2/query",
+  "apiKeyConfigured": true
+}
 ```
 
 ### 上传素材到 RunningHub
@@ -60,11 +100,19 @@ x-file-name: demo.mp4
 
 成功后返回 RunningHub 的 `download_url`，再把这个 URL 填入对应节点。
 
-### 提交工作流
+### 提交 AI App 工作流
+
+前端仍然调用项目自己的后端代理：
 
 ```http
 POST /api/runninghub/workflow/run
 Content-Type: application/json
+```
+
+后端会转发到：
+
+```txt
+https://www.runninghub.cn/openapi/v2/run/ai-app/2050306122774532097
 ```
 
 请求体：
@@ -72,6 +120,7 @@ Content-Type: application/json
 ```json
 {
   "workflowId": "2050306122774532097",
+  "submitMode": "ai-app",
   "instanceType": "default",
   "usePersonalQueue": false,
   "nodeInfoList": [
@@ -89,6 +138,12 @@ Content-Type: application/json
 ```http
 POST /api/runninghub/workflow/query
 Content-Type: application/json
+```
+
+后端会转发到：
+
+```txt
+https://www.runninghub.cn/openapi/v2/query
 ```
 
 请求体：
@@ -145,9 +200,9 @@ https://your-domain.com/api/runninghub/workflow/webhook
 
 ## 4. 最重要的待填项
 
-目前官方页面没有公开显示你的具体 ComfyUI 节点 ID，所以前端页面做成了可配置版。
+目前已确认提交模式是 `openapi-v2-ai-app`，但具体输入节点仍然要以 `qwenImageEditManifest.js` 或 RunningHub API 页面复制出的 `nodeInfoList` 为准。
 
-你需要在 RunningHub 工作流 API 页面或 workflow JSON 中确认：
+需要确认：
 
 ```txt
 视频输入节点 nodeId + fieldName
@@ -166,8 +221,8 @@ image_url
 video_url
 ```
 
-最终以 RunningHub 页面复制出来的 cURL / nodeInfoList 为准。
+最终以 RunningHub 页面复制出来的 cURL / nodeInfoList / AI CanvasPro manifest 为准。
 
 ## 5. 结果链接转存提醒
 
-RunningHub 文档提示，生成结果 URL 通常只有 24 小时有效。生产环境应在 `SUCCESS` 后立即把 `results[].url` 下载并转存到自己的对象存储。
+RunningHub 结果 URL 通常有时效。生产环境应在 `SUCCESS` 后立即把 `results[].url` 下载并转存到自己的对象存储。
